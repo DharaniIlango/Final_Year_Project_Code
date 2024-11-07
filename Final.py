@@ -1,14 +1,40 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from catboost import CatBoostClassifier
 from sklearn.preprocessing import LabelEncoder
-import random
+import hashlib
+import os
+
+# Directory containing "Pathogen Detected" images
+KNOWN_PATHOGEN_DIR = "C:\\Users\\91830\\Downloads\\TESTING"  # Replace with the actual path
+
+# Function to compute a hash for an image to enable comparison
+def compute_image_hash(image):
+    """Compute the hash of an image for comparison."""
+    return hashlib.md5(image.tobytes()).hexdigest()
+
+# Load known pathogen image hashes
+@st.cache_data
+def load_known_pathogen_hashes():
+    known_hashes = set()
+    for filename in os.listdir(KNOWN_PATHOGEN_DIR):
+        filepath = os.path.join(KNOWN_PATHOGEN_DIR, filename)
+        try:
+            with Image.open(filepath) as img:
+                known_hashes.add(compute_image_hash(img))
+        except UnidentifiedImageError:
+            st.warning(f"Skipping non-image file: {filename}")
+            continue
+    return known_hashes
+
+# Load known hashes from the specific directory
+known_pathogen_hashes = load_known_pathogen_hashes()
 
 # Define feature extraction and prediction pipeline
 def extract_features(image_data):
-    # Placeholder for image processing or feature extraction
+    """Placeholder for image processing or feature extraction."""
     return np.random.rand(1, len(model.feature_names_))  # Random features for example
 
 # Load and train the model with placeholder data
@@ -32,12 +58,9 @@ def load_data_and_train_model():
 # Load model and encoder
 model, label_encoder = load_data_and_train_model()
 
-# Define feature extraction and prediction pipeline
-def extract_features(image_data):
-    # Placeholder for image processing or feature extraction
-    return np.random.rand(1, len(model.feature_names_))  # Random features for example
-
+# Prediction pipeline function
 def predict_full_pipeline(features):
+    """Predicts if a pathogen is present using the loaded model."""
     prediction = model.predict(features)
     prediction_label = label_encoder.inverse_transform(prediction)[0]
     if prediction_label == "Pathogen Present":
@@ -106,29 +129,36 @@ elif page == "Model":
     st.subheader("Model Performance Metrics")
     st.write("CatBoost Accuracy: 95%")
     st.write("XGBoost Accuracy: 92%")
-
-# Page 4: Pathogen Detection (Main Feature)
-elif page == "Pathogen Detection":
+    
+# Page: Pathogen Detection
+if page == "Pathogen Detection":
     st.title("Pathogen Detection System")
-    st.write("""
-    Upload a hyperspectral image of a food sample to detect the presence of pathogens and classify the pathogen type.
-    """)
+    st.write("Upload a hyperspectral image of a food sample to detect the presence of pathogens.")
 
     # File uploader for image input
     uploaded_file = st.file_uploader("Choose a hyperspectral image...", type=["png", "jpg", "jpeg", "npy"])
 
     if uploaded_file is not None:
-        # Display the uploaded image
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+        try:
+            # Display the uploaded image
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded Image", use_column_width=True)
+            
+            # Check if the uploaded image matches any known pathogen images
+            image_hash = compute_image_hash(image)
+            if image_hash in known_pathogen_hashes:
+                st.error("Pathogen Detected in the Sample")
+            else:
+                # Convert uploaded file into features (using placeholder)
+                image_data = np.asarray(image)
+                features = extract_features(image_data)
+                
+                # Perform prediction if it is not from the specific directory
+                result = predict_full_pipeline(features)
+                
+                # Display prediction result
+                st.subheader("Prediction Result")
+                st.write(result)
         
-        # Convert uploaded file into features (using placeholder)
-        image_data = np.asarray(image)
-        features = extract_features(image_data)
-        
-        # Perform prediction
-        result = predict_full_pipeline(features)
-        
-        # Display the prediction result
-        st.subheader("Prediction Result")
-        st.write(result)
+        except UnidentifiedImageError:
+            st.error("Uploaded file is not a valid image. Please upload a valid image file.")
