@@ -16,7 +16,6 @@ def compute_image_hash(image):
     return hashlib.md5(image.tobytes()).hexdigest()
 
 # Load known pathogen image hashes
-@st.cache_data
 def load_known_pathogen_hashes():
     known_hashes = set()
     for filename in os.listdir(KNOWN_PATHOGEN_DIR):
